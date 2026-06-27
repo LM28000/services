@@ -8,6 +8,7 @@
 !/*.md
 !**/docker-compose.yml
 !**/docker-compose.*.yml
+!**/*.env.example
 !/scripts/**
 
 # === Exclusions dures (priment sur tout) ===
