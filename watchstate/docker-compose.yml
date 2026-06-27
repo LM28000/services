@@ -1,0 +1,15 @@
+# Stack: watchstate (migration compose-sur-disque)
+# Données : ./data (bind, déjà dans /docker/services/watchstate/data — rien à déplacer)
+# Aucun secret.
+services:
+  watchstate:
+    image: ghcr.io/arabcoders/watchstate:latest
+    container_name: watchstate
+    restart: unless-stopped
+    environment:
+      WS_TZ: UTC
+    ports:
+      - "8087:8080"
+    volumes:
+      - ./data:/config
+# Réseau : compose crée "watchstate_default" (isolé).

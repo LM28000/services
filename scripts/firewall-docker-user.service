@@ -1,0 +1,12 @@
+[Unit]
+Description=Applique les regles de pare-feu DOCKER-USER (audit-fw)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/docker/services/scripts/firewall-docker-user.sh apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

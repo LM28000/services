@@ -1,0 +1,190 @@
+# Monitoring stack — compose-sur-disque (généré par docker inspect, 2026-06-27)
+# PREP UNIQUEMENT — ne pas exécuter `docker compose up` sans relire les NOTES ci-dessous.
+#
+# NOTES de relocalisation / réseau :
+#  - prometheus tournait dans le projet "prometheus" (réseau prometheus_default).
+#    Il est ici rattaché au réseau local "monitoring_net". Sans impact : prometheus.yml
+#    scrape les cibles via l'IP hôte 192.168.0.75 (pas par DNS de conteneur).
+#  - prometheus : volume de données = volume nommé EXISTANT "prometheus_prometheus_data"
+#    (déclaré external pour ne PAS perdre les données historiques).
+#  - uptime_kuma : le montage /var/run/docker.sock (était en RW) a été RETIRÉ (inutile).
+#  - dozzle : docker.sock forcé en :ro (était RW). glances : déjà :ro.
+
+services:
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    user: "472"
+    ports:
+      - "3000:3000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_PATHS_CONFIG=/etc/grafana/grafana.ini
+      - GF_PATHS_DATA=/var/lib/grafana
+      - GF_PATHS_HOME=/usr/share/grafana
+      - GF_PATHS_LOGS=/var/log/grafana
+      - GF_PATHS_PLUGINS=/var/lib/grafana/plugins
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    env_file:
+      - .env
+    volumes:
+      - /docker/services/grafana:/var/lib/grafana
+    networks:
+      - internal_net
+
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
+    ports:
+      - "8098:8080"
+    environment:
+      - CADVISOR_HEALTHCHECK_URL=http://localhost:8080/healthz
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider $$CADVISOR_HEALTHCHECK_URL || exit 1"]
+      interval: 30s
+      timeout: 3s
+    networks:
+      - internal_net
+
+  glances:
+    container_name: glances
+    image: nicolargo/glances:latest
+    restart: unless-stopped
+    ports:
+      - "61208:61208"
+    environment:
+      - GLANCES_OPT=-w
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - dmz_net
+
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - dmz_net
+
+  uptime_kuma:
+    container_name: uptime_kuma
+    image: louislam/uptime-kuma:beta
+    restart: unless-stopped
+    ports:
+      - "3002:3001"
+    environment:
+      - UPTIME_KUMA_ENABLE_EMBEDDED_MARIADB=1
+      - UPTIME_KUMA_IS_CONTAINER=1
+    volumes:
+      - /docker/services/uptime-kuma:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "extra/healthcheck"]
+      interval: 60s
+      timeout: 30s
+      start_period: 180s
+      retries: 5
+    networks:
+      - dmz_net
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    user: nobody
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    ports:
+      - "9090:9090"
+    volumes:
+      - /docker/services/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring_net
+
+  node-exporter:
+    container_name: node-exporter
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    user: nobody
+    network_mode: host
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|pipefs|proc|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$"
+    volumes:
+      - /:/host:ro
+
+  scrutiny:
+    container_name: scrutiny
+    image: ghcr.io/analogj/scrutiny:master-omnibus
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+      - "8086:8086"
+    environment:
+      - INFLUXD_CONFIG_PATH=/opt/scrutiny/influxdb
+    # cap_add capturé fidèlement depuis `docker inspect` (.HostConfig.CapAdd).
+    # CAP_SYS_RAWIO + AUDIT_WRITE sont les ajouts métier (SMART) ; le reste correspond
+    # à l'ensemble passé explicitement au `docker run` d'origine.
+    cap_add:
+      - CAP_SYS_RAWIO
+      - AUDIT_WRITE
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - FSETID
+      - KILL
+      - MKNOD
+      - NET_BIND_SERVICE
+      - NET_RAW
+      - SETFCAP
+      - SETGID
+      - SETPCAP
+      - SETUID
+      - SYS_CHROOT
+    volumes:
+      - /home/louis/influxdb2:/opt/scrutiny/influxdb
+      - /home/louis/scrutiny:/opt/scrutiny/config
+      - /run/udev:/run/udev:ro
+    devices:
+      - /dev/sda:/dev/sda
+      - /dev/sdb:/dev/sdb
+      - /dev/sdc:/dev/sdc
+      - /dev/sdd:/dev/sdd
+      - /dev/sde:/dev/sde
+      - /dev/sdf:/dev/sdf
+      - /dev/sdg:/dev/sdg
+      - /dev/sdh:/dev/sdh
+      - /dev/sdi:/dev/sdi
+      - /dev/nvme0n1p2:/dev/nvme0n1p2
+    networks:
+      - monitoring_net
+
+networks:
+  internal_net:
+    external: true
+  dmz_net:
+    external: true
+  monitoring_net:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+    external: true
+    name: prometheus_prometheus_data

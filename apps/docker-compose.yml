@@ -1,0 +1,243 @@
+# compose-sur-disque : groupe "apps"
+# Genere depuis `docker inspect` (PREP UNIQUEMENT - ne pas `up` sans revue).
+# Secrets dans secrets.*.env (chmod 600), jamais en clair ici.
+
+services:
+
+  # ---------------------------------------------------------------
+  # Redis (cache/verrouillage Nextcloud) — réintégré depuis l'ex-stack secure_dmz2.
+  # Interne uniquement (aucun port hôte) : corrige le finding "Redis exposé sans auth".
+  # ---------------------------------------------------------------
+  redis:
+    container_name: redis
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - internal_net
+      - dmz_net
+
+  # ---------------------------------------------------------------
+  # Nextcloud (app + cron + db)
+  # ---------------------------------------------------------------
+  nextcloud_app:
+    container_name: nextcloud_app
+    image: nextcloud:latest
+    restart: unless-stopped
+    depends_on:
+      - nextcloud_db
+    ports:
+      - "8081:80"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      MYSQL_HOST: nextcloud_db
+      MYSQL_DATABASE: nextcloud_db
+      MYSQL_USER: nextcloud_user
+    env_file:
+      - secrets.nextcloud.env
+    volumes:
+      - /docker/services/nextcloud/app:/var/www/html
+      - /docker/services/nextcloud/apps:/var/www/html/custom_apps
+      - /mnt/pool/nextcloud:/var/www/html/data
+      - /mnt/pool/Plex:/Plex
+    networks:
+      - dmz_net
+      - internal_net
+
+  nextcloud_cron:
+    container_name: nextcloud_cron
+    image: nextcloud:latest
+    restart: unless-stopped
+    # entrypoint cron specifique (!= /entrypoint.sh de l'image)
+    entrypoint: ["/cron.sh"]
+    depends_on:
+      - nextcloud_db
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    volumes:
+      - /docker/services/nextcloud/app:/var/www/html
+      - /docker/services/nextcloud/apps:/var/www/html/custom_apps
+      - /mnt/pool/nextcloud:/var/www/html/data
+    networks:
+      - dmz_net
+      - internal_net
+
+  nextcloud_db:
+    container_name: nextcloud_db
+    image: mariadb:10.6
+    restart: unless-stopped
+    # MariaDB : aucun port publie sur l'hote (acces interne uniquement)
+    environment:
+      MYSQL_DATABASE: nextcloud_db
+      MYSQL_USER: nextcloud_user
+    env_file:
+      - secrets.nextcloud-db.env
+    volumes:
+      - /docker/services/nextcloud/db:/var/lib/mysql
+    networks:
+      - internal_net
+
+  # ---------------------------------------------------------------
+  # Vaultwarden (durcissement : SIGNUPS_ALLOWED=false + DOMAIN)
+  # ---------------------------------------------------------------
+  vaultwarden:
+    container_name: vaultwarden
+    image: vaultwarden/server:latest
+    restart: unless-stopped
+    ports:
+      - "8084:80"
+      - "3012:3012"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      WEBAUTH_ENABLED: "true"
+      WEBSOCKET_ENABLED: "true"
+      ROCKET_PROFILE: release
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_PORT: "80"
+      SIGNUPS_ALLOWED: "false"
+      DOMAIN: https://vault.du-cray.eu
+    env_file:
+      - secrets.vaultwarden.env
+    volumes:
+      - /docker/services/vaultwarden:/data
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 60s
+      timeout: 10s
+    networks:
+      - dmz_net
+
+  # ---------------------------------------------------------------
+  # Actual Budget
+  # ---------------------------------------------------------------
+  actual_budget:
+    container_name: actual_budget
+    image: actualbudget/actual-server:latest
+    restart: unless-stopped
+    ports:
+      - "5006:5006"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      NODE_ENV: production
+    volumes:
+      - /docker/services/actual_budget:/data
+    networks:
+      - dmz_net
+
+  # ---------------------------------------------------------------
+  # Roundcube webmail
+  # ---------------------------------------------------------------
+  roundcube_app:
+    container_name: roundcube_app
+    image: roundcube/roundcubemail:latest
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      ROUNDCUBEMAIL_DEFAULT_HOST: ssl://ssl0.ovh.net
+      ROUNDCUBEMAIL_DEFAULT_PORT: "993"
+      ROUNDCUBEMAIL_SMTP_SERVER: ssl://ssl0.ovh.net
+      ROUNDCUBEMAIL_SMTP_PORT: "465"
+      ROUNDCUBEMAIL_PLUGINS: archive,zipdownload
+    volumes:
+      - /docker/services/roundcube_app/config:/var/www/html/config
+      - /docker/services/roundcube_app/data:/var/www/html/logs
+    networks:
+      - dmz_net
+      - internal_net
+
+  # ---------------------------------------------------------------
+  # Homelab dashboard (nginx static)
+  # ---------------------------------------------------------------
+  homelab_dashboard:
+    container_name: homelab_dashboard
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8089:80"
+    volumes:
+      - /docker/services/homelab-dashboard:/usr/share/nginx/html:ro
+    networks:
+      - dmz_net
+
+  # ---------------------------------------------------------------
+  # IT-Tools
+  # ---------------------------------------------------------------
+  it-tools:
+    container_name: it-tools
+    image: corentinth/it-tools:latest
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    networks:
+      - secure_dmz2_default
+
+  # ---------------------------------------------------------------
+  # MediaWiki (app + db)
+  # ---------------------------------------------------------------
+  mediawiki_app:
+    container_name: mediawiki_app
+    image: mediawiki:1.39
+    restart: unless-stopped
+    depends_on:
+      - mediawiki_db
+    ports:
+      - "8083:80"
+    environment:
+      MEDIAWIKI_DB_TYPE: mariadb
+      MEDIAWIKI_DB_HOST: database
+      MEDIAWIKI_DB_NAME: mediawiki_db
+      MEDIAWIKI_DB_USER: mediawiki_user
+    env_file:
+      - secrets.mediawiki.env
+    volumes:
+      # NOTE: fichier hors arborescence /docker/services - conserve tel quel
+      - /opt/mediawiki-stack/config/LocalSettings.php:/var/www/html/LocalSettings.php
+      # relocalise depuis /data/compose/17/data/images (interne Portainer)
+      - /docker/services/apps/mediawiki-images:/var/www/html/images
+    networks:
+      - mediawiki_default
+
+  mediawiki_db:
+    container_name: mediawiki_db
+    image: mariadb:10.6
+    restart: unless-stopped
+    # MariaDB : etait expose en 0.0.0.0:3306 -> restreint a la loopback
+    ports:
+      - "127.0.0.1:3306:3306"
+    environment:
+      MARIADB_DATABASE: mediawiki_db
+      MARIADB_USER: mediawiki_user
+    env_file:
+      - secrets.mediawiki-db.env
+    volumes:
+      # relocalise depuis /data/compose/17/data/db (interne Portainer)
+      - /docker/services/apps/mediawiki-db:/var/lib/mysql
+    networks:
+      mediawiki_default:
+        # MEDIAWIKI_DB_HOST=database -> l'app resout la db via cet alias
+        aliases:
+          - database
+
+networks:
+  # Reseaux partages (preexistants, geres hors de ce stack)
+  dmz_net:
+    external: true
+  internal_net:
+    external: true
+  # Reseau de l'autre stack securise (it-tools y est rattache)
+  secure_dmz2_default:
+    external: true
+  # Reseau dedie au couple mediawiki (app + db). Local a ce stack.
+  mediawiki_default:
+    driver: bridge

@@ -1,0 +1,31 @@
+services:
+  headscale:
+    container_name: headscale
+    image: headscale/headscale:latest
+    restart: unless-stopped
+    command:
+      - serve
+      - -c
+      - /etc/headscale/config.yaml
+    ports:
+      - "9999:8080"
+    volumes:
+      - ./config:/etc/headscale
+      - ./data:/var/lib/headscale
+    networks:
+      - default
+
+  headscale-ui:
+    container_name: headscale-ui
+    image: ghcr.io/gurucomputing/headscale-ui:latest
+    restart: unless-stopped
+    ports:
+      - "9092:8080"
+    networks:
+      - default
+
+networks:
+  # Réseau propre au stack (headscale + headscale-ui), géré par compose.
+  # Nom conservé pour rester cohérent avec l'existant (anciennement projet "headscale2").
+  default:
+    name: headscale2_default

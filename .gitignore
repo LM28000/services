@@ -1,0 +1,46 @@
+# === Dépôt IaC : on ne versionne QUE les docker-compose, scripts et docs top-level ===
+# Tout ignorer par défaut
+*
+# Autoriser la traversée des dossiers (pour atteindre les compose)
+!*/
+# Fichiers explicitement versionnés
+!.gitignore
+!/*.md
+!**/docker-compose.yml
+!**/docker-compose.*.yml
+!/scripts/**
+
+# === Exclusions dures (priment sur tout) ===
+# Dépôts git imbriqués / pré-existants (gérés ailleurs)
+.git/
+**/.git/
+media-stack/
+control-tower/
+CryptoBot/
+PEABot/
+# Arbres d'application / données (pas de l'IaC)
+nextcloud/
+**/node_modules/
+**/vendor/
+**/data/
+**/storage/
+**/postgresdata/
+**/cache/
+**/mediawiki-db/
+**/mediawiki-images/
+**/ollama-data/
+# Secrets — JAMAIS commités
+**/.env
+**/*.env
+**/secrets/
+**/*.pem
+**/*.key
+**/configuration.yml
+**/configuration.cutover.yml
+**/users_database.yml
+# Bases / dumps / backups
+**/*.sqlite*
+**/*.db
+**/*.sql
+**/*.sql.gz
+backups/

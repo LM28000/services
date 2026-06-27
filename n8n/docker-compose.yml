@@ -1,0 +1,22 @@
+services:
+  n8n:
+    container_name: n8n
+    image: ghcr.io/n8n-io/n8n:ci-22914567060
+    restart: always
+    network_mode: host
+    user: node
+    environment:
+      TZ: Europe/Paris
+      N8N_HOST: n8n.du-cray.eu
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://n8n.du-cray.eu/
+      N8N_TRUST_PROXY: "true"
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+      N8N_RUN_TASKS_IN_INTERNAL_PROCESS: "true"
+      EXECUTIONS_DATA_PRUNE: "true"
+    env_file:
+      - .env
+    volumes:
+      - /docker/services/n8n/n8n_data:/home/node/.n8n
+      - /home/ton_user/.ssh:/home/node/.ssh:ro

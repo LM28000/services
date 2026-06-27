@@ -1,0 +1,133 @@
+# Matrix stack — compose-on-disk migration (PREP only, not deployed)
+# Container names preserved exactly to avoid breaking external references.
+# Secrets live in .env (env_file). Do NOT put secret values here.
+
+services:
+  matrix_db:
+    container_name: matrix_db
+    image: postgres:15-alpine
+    restart: always
+    # Custom command preserved: passes initdb args (lc-collate=C) — differs from image default ["postgres"]
+    command:
+      - postgres
+      - -c
+      - initdb.args=--lc-collate=C --lc-ctype=C --encoding=UTF8
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      # POSTGRES_PASSWORD comes from .env
+    env_file:
+      - .env
+    volumes:
+      - /docker/services/matrix/postgresdata:/var/lib/postgresql/data
+    networks:
+      matrix_default:
+        # alias "db" : synapse (homeserver.yaml) référence l'hôte DB sous le nom "db"
+        aliases:
+          - db
+    # No host port published (internal only)
+
+  matrix_synapse:
+    container_name: matrix_synapse
+    image: matrixdotorg/synapse:latest
+    restart: always
+    environment:
+      UID: "1000"
+      GID: "1000"
+    volumes:
+      - /docker/services/matrix/data:/data
+    ports:
+      - "8008:8008"
+    networks:
+      - matrix_default
+    depends_on:
+      - matrix_db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fSs http://localhost:8008/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 5s
+
+  matrix_element:
+    container_name: matrix_element
+    image: vectorim/element-web:latest
+    restart: always
+    environment:
+      # Kept because the healthcheck below references $ELEMENT_WEB_PORT
+      ELEMENT_WEB_PORT: "80"
+    volumes:
+      - /docker/services/matrix/element-config.json:/app/config.json
+    ports:
+      - "7777:80"
+    networks:
+      - matrix_default
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:$$ELEMENT_WEB_PORT/config.json"]
+      start_period: 5s
+
+  matrix_admin:
+    container_name: matrix_admin
+    image: awesometechnologies/synapse-admin:latest
+    restart: always
+    ports:
+      - "6666:80"
+    networks:
+      - matrix_default
+
+  matrix-maubot-1:
+    container_name: matrix-maubot-1
+    image: dock.mau.dev/maubot/maubot:latest
+    restart: unless-stopped
+    volumes:
+      # :z SELinux relabel suffix preserved
+      - /docker/services/maubot:/data:z
+    ports:
+      - "29316:29316"
+    networks:
+      - matrix_default
+
+  matrix-hookshot-1:
+    container_name: matrix-hookshot-1
+    image: halfshot/matrix-hookshot:latest
+    restart: always
+    volumes:
+      # /data is a writable volume; specific config files are bind-mounted over it (matching live state)
+      - hookshot_data:/data
+      - /docker/services/hookshot/config.yml:/data/config.yml:ro
+      - /docker/services/hookshot/github-app-key.pem:/data/github-app-key.pem
+      - /docker/services/hookshot/passkey.pem:/data/passkey.pem:ro
+      - /docker/services/hookshot/registration.yml:/data/registration.yml:ro
+      - /docker/services/hookshot/storage:/data/storage
+    ports:
+      - "9000:9000"
+      - "9002:9002"
+      - "9993:9993"
+    networks:
+      - matrix_default
+
+  mautrix-whatsapp:
+    container_name: mautrix-whatsapp
+    image: litetex/mau.mautrix.whatsapp:latest
+    restart: always
+    volumes:
+      - /docker/services/matrix/data/bridge:/data
+    ports:
+      - "29318:29318"
+    networks:
+      - mautrix_whatsapp_default
+
+networks:
+  # Réseau propre au stack matrix — recréé par compose (supprimé avec l'ancien stack Portainer)
+  matrix_default:
+    name: matrix_default
+  # Réseau de mautrix-whatsapp — géré par compose (réutilisé s'il existe déjà)
+  mautrix_whatsapp_default:
+    name: mautrix_whatsapp_default
+
+volumes:
+  # Anonymous /data volume that hookshot uses at runtime, redeclared as named
+  hookshot_data:

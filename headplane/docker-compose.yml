@@ -1,0 +1,32 @@
+services:
+  headplane:
+    container_name: headplane
+    image: ghcr.io/tale/headplane:latest
+    restart: unless-stopped
+    user: root
+    env_file: .env
+    environment:
+      AUTH_MODE: oidc
+      OIDC_ISSUER: https://auth.du-cray.eu
+      OIDC_CLIENT_ID: headplane
+      OIDC_SCOPE: openid email profile
+      OIDC_REDIRECT_URI: https://headplane.du-cray.eu/admin/api/auth/callback
+      # Désactive la vérification TLS sortante (conservé tel quel depuis l'existant).
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+    ports:
+      - "3006:3000"
+    volumes:
+      - ./config.yaml:/etc/headplane/config.yaml:ro
+      - ./headplane-data:/var/lib/headplane
+    healthcheck:
+      test: ["CMD", "/bin/hp_healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    networks:
+      - default
+
+networks:
+  default:
+    name: headplane_default

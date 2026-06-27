@@ -1,0 +1,270 @@
+# Compose-on-disk migration for the "media" group.
+# Generated from `docker inspect`. PREP ONLY — do NOT run `docker compose up`
+# without first verifying data relocations (jackett, flaresolverr) noted below.
+
+services:
+
+  sonarr:
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "8989:8989"
+    volumes:
+      - /docker/services/sonarr:/config
+      - /mnt/pool/Plex/shows:/tv
+      - /mnt/diskE/qbittorent:/downloads
+    networks:
+      - internal_net
+
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      DOCKER_MODS: linuxserver/mods:universal-package-install
+      INSTALL_PACKAGES: mkvtoolnix
+    ports:
+      - "7878:7878"
+    volumes:
+      - /docker/services/radarr:/config
+      - /mnt/diskE/qbittorent:/downloads
+      - /mnt/pool/Plex/movies:/movies/movies
+      - /mnt/pool/Plex/children:/children/children
+    networks:
+      - internal_net
+
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "6767:6767"
+    volumes:
+      - /docker/services/bazarr:/config
+      - /mnt/pool/Plex/movies:/movies
+      - /mnt/pool/Plex/shows:/tv
+      - /mnt/pool/Plex/children:/children
+    networks:
+      - internal_net
+
+  prowlarr:
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "9696:9696"
+    volumes:
+      - /docker/services/prowlarr:/config
+    networks:
+      - internal_net
+
+  qbittorrent:
+    container_name: qbittorrent
+    image: binhex/arch-qbittorrentvpn:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      VPN_PROV: custom
+      OPENVPN_CONFIG: /config/openvpn/openvpn.ovpn
+      CUSTOM_DNS: 8.8.8.8
+      WEBUI_PORT: "8080"
+      LAN_NETWORK: 192.168.0.0/24,192.168.0.1/32
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - /docker/services/qbittorrent:/config
+      - /mnt/diskE/qbittorent:/data
+      - /mnt/vpn_config:/config/openvpn
+    networks:
+      - dmz_net
+      - internal_net
+
+  tdarr:
+    container_name: tdarr
+    image: haveagitgat/tdarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      UMASK: "002"
+      serverip: 0.0.0.0
+      internalNode: "true"
+      nodeName: TdarrInternalNode
+      WEB_UI_PORT: "8265"
+      SERVER_PORT: "8266"
+      NODE_PORT: "8267"
+      inContainer: "true"
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      NVIDIA_VISIBLE_DEVICES: all
+    ports:
+      - "8265:8265"
+      - "8266:8266"
+    volumes:
+      - /docker/services/tdarr/server:/app/server
+      - /docker/services/tdarr/config:/app/configs
+      - /mnt/pool/Plex/movies:/movies
+      - /mnt/pool/Plex/children:/children
+      - /mnt/pool/Plex/shows:/tv
+      - /mnt/diskE/tdarr_temp:/temp
+    networks:
+      - internal_net
+
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:latest
+    restart: unless-stopped
+    user: node:node
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      LOG_LEVEL: info
+    ports:
+      - "5000:5055"
+    volumes:
+      - /docker/services/overseerr:/app/config
+    networks:
+      - dmz_net
+      - internal_net
+
+  requestrr:
+    container_name: requestrr
+    image: darkalfx/requestrr:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "4545:4545"
+    volumes:
+      - /docker/services/requestrr:/config
+    networks:
+      - secure_dmz2_default
+
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    user: flaresolverr
+    environment:
+      TZ: Europe/Paris
+    ports:
+      - "8191:8191"
+    volumes:
+      - flaresolverr_config:/config
+    networks:
+      - dmz_net
+      - internal_net
+
+  tautulli:
+    container_name: tautulli
+    image: lscr.io/linuxserver/tautulli:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "8181:8181"
+    volumes:
+      - /docker/services/tautulli:/config
+    networks:
+      - internal_net
+
+  qui:
+    container_name: qui
+    image: ghcr.io/autobrr/qui:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "7476:7476"
+    volumes:
+      - /docker/services/qui:/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7476/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - secure_dmz2_default
+
+  plex:
+    container_name: plex
+    image: lscr.io/linuxserver/plex:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      VERSION: docker
+      ADVERTISED_IPs: http://192.168.0.75:32400/
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility,graphics
+    volumes:
+      - /docker/services/plex/config:/config
+      - /mnt/pool/Plex/photos:/photos
+      - /mnt/pool/Plex/shows:/tv
+      - /mnt/pool/Plex/movies:/movies
+      - /mnt/pool/Plex/children:/children
+      - /mnt/diskE/plex_temp:/transcode
+
+  jackett:
+    container_name: jackett
+    image: lscr.io/linuxserver/jackett:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+    ports:
+      - "9117:9117"
+    # NOTE: original paths were /data/compose/36/jackett/{config,downloads}
+    # (internal Portainer). Data must be relocated to these host paths.
+    volumes:
+      - /docker/services/jackett/config:/config
+      - /docker/services/jackett/downloads:/downloads
+    networks:
+      - jackett_default
+
+networks:
+  internal_net:
+    external: true
+  dmz_net:
+    external: true
+  secure_dmz2_default:
+    external: true
+  # Réseau propre à jackett — géré par compose (supprimé avec l'ancien stack Portainer)
+  jackett_default:
+    name: jackett_default
+
+volumes:
+  flaresolverr_config:

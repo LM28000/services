@@ -1,0 +1,13 @@
+services:
+  kometa:
+    image: kometateam/kometa
+    container_name: kometa
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      - PUID=1000 # À vérifier avec la commande 'id'
+      - PGID=1000
+      - TZ=Europe/Paris
+    volumes:
+      - /docker/services/kometa/config:/config:rw

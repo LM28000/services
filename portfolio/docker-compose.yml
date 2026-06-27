@@ -1,0 +1,32 @@
+services:
+  portfolio:
+    container_name: portfolio-production
+    # IMAGE BUILDÉE LOCALEMENT (aucun registre).
+    # ATTENTION reproductibilité : le contexte de build (Dockerfile + sources) n'est
+    # plus présent sur disque. Pour reconstruire l'image il faudra retrouver ce contexte
+    # et ajouter une section `build:` ici (ex: build: ./src). En l'état, le déploiement
+    # dépend de l'image locale existante `portfolio-portfolio`.
+    image: portfolio-portfolio
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      API_PORT: "8080"
+    ports:
+      - "2368:80"
+    volumes:
+      - admin_files:/app/admin-files
+      # Logs nginx : RELOCALISÉS depuis /data/compose/39/.../logs vers ./logs.
+      - ./logs:/var/log/nginx
+    networks:
+      - default
+
+networks:
+  default:
+    name: portfolio_default
+
+volumes:
+  # Volume nommé existant contenant des données à préserver -> external.
+  admin_files:
+    name: portfolio_admin_files
+    external: true

@@ -1,0 +1,19 @@
+# Stack: qdrant (PILOTE de migration vers compose-sur-disque)
+# Déploiement : voir CLEANUP-PLAN.md (supprimer l'ancien stack Portainer AVANT)
+# Données : ./storage (bind, préservé entre recréations)
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Paris
+    ports:
+      # NOTE sécurité : qdrant n'a PAS de clé API → exposé sans auth.
+      # À terme : binder 127.0.0.1 si seuls des conteneurs locaux l'utilisent,
+      # ou définir QDRANT__SERVICE__API_KEY (via .env).
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./storage:/qdrant/storage
+# Réseau : compose crée automatiquement "qdrant_default" (isolé).
