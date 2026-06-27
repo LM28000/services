@@ -44,4 +44,6 @@ nextcloud/
 **/*.db
 **/*.sql
 **/*.sql.gz
-backups/
+# Docs sensibles (vuln report + carte d'archi) : jamais sur un repo public
+SECURITY-AUDIT.md
+INFRASTRUCTURE.md
