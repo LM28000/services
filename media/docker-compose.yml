@@ -151,6 +151,26 @@ services:
       - dmz_net
       - internal_net
 
+  # 2e instance Seerr dédiée Jellyfin (l'instance "seerr" ci-dessus est verrouillée sur Plex).
+  # Config + port séparés ; mêmes réseaux pour joindre jellyfin:8096 par nom de conteneur.
+  jellyseerr:
+    container_name: jellyseerr
+    image: ghcr.io/seerr-team/seerr:latest
+    restart: unless-stopped
+    user: node:node
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      LOG_LEVEL: info
+    ports:
+      - "5001:5055"
+    volumes:
+      - /docker/services/jellyseerr:/app/config
+    networks:
+      - dmz_net
+      - internal_net
+
   requestrr:
     container_name: requestrr
     image: darkalfx/requestrr:latest
