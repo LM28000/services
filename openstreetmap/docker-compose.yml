@@ -1,0 +1,47 @@
+# Carte vivante : le site et son serveur (trains, avions, bateaux… en temps réel),
+# et archivage continu du temps réel des trains. Site : http://192.168.0.75:8787/
+#
+# Code de l application : https://github.com/LM28000/openstreetmap, cloné dans ./app (dépôt à part).
+# Mise à jour : (cd app && git pull) && docker compose -p openstreetmap up -d --build
+# Données : ./data (téléchargements, recréables) et ./archive (archives du temps réel, à garder).
+
+name: openstreetmap
+
+services:
+  carte-vivante:
+    # Contexte : la racine du dépôt (le site et le serveur sont construits ensemble).
+    build:
+      context: ./app
+      dockerfile: server/Dockerfile
+    image: carte-vivante-serveur
+    container_name: carte-vivante
+    restart: unless-stopped
+    user: "${RUN_AS:-1000:1000}"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8787}:8787"
+    environment:
+      # Clé aisstream.io de la couche « Bateaux » (dans .env, chmod 600). Vide = couche désactivée.
+      AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
+      # Compte Atmo Data de la couche « Qualité de l air » (dans .env). Vides = couche désactivée.
+      ATMO_USERNAME: "${ATMO_USERNAME:-}"
+      ATMO_PASSWORD: "${ATMO_PASSWORD:-}"
+      # Clé PRIM d Île-de-France Mobilités (dans .env). Vide = transports d Île-de-France ignorés.
+      IDFM_PRIM_API_KEY: "${IDFM_PRIM_API_KEY:-}"
+    volumes:
+      - ./data:/data
+      - ./archive:/archive
+    # Isolation : lecture seule, aucun privilège, mémoire (pic mesuré 540 Mo) et processeur bornés.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 2.0
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
