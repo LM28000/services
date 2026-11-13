@@ -1,7 +1,7 @@
 # Carte vivante : le site et son serveur (trains, avions, bateaux… en temps réel),
 # et archivage continu du temps réel des trains. Site : http://192.168.0.75:8787/
 #
-# Code de l application : https://github.com/LM28000/openstreetmap, cloné dans ./app (dépôt à part).
+# Code de l application : https://github.com/LM28000/vigie, cloné dans ./app (dépôt à part).
 # Mise à jour : (cd app && git pull) && docker compose -p openstreetmap up -d --build
 # Données : ./data (téléchargements, recréables) et ./archive (archives du temps réel, à garder).
 
