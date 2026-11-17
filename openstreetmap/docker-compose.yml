@@ -27,6 +27,10 @@ services:
       ATMO_PASSWORD: "${ATMO_PASSWORD:-}"
       # Clé PRIM d Île-de-France Mobilités (dans .env). Vide = transports d Île-de-France ignorés.
       IDFM_PRIM_API_KEY: "${IDFM_PRIM_API_KEY:-}"
+      # Clé Windy Webcams de la couche « Caméras » (dans .env). Vide = webcams Windy désactivées.
+      WINDY_WEBCAMS_KEY: "${WINDY_WEBCAMS_KEY:-}"
+      # Jeton Cesium ion de la « Vue photoréaliste » (dans .env). Vide = vue désactivée.
+      CESIUM_ION_TOKEN: "${CESIUM_ION_TOKEN:-}"
     volumes:
       - ./data:/data
       - ./archive:/archive
